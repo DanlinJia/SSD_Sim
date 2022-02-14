@@ -99,14 +99,24 @@ namespace SSD_Components
 
 	void Input_Stream_Manager_Base::Update_transaction_statistics(NVM_Transaction* transaction)
 	{
+		std::ofstream myfile;
+		myfile.open ("waiting", std::ios::app);
+		//myfile << request_delay << " " << request_delay - cqe->trans_t - cqe->exec_t << "\n";
+
+		myfile << transaction->Issue_time <<" "<< (int)transaction->Type << " "<< transaction->STAT_execution_time<< " " << transaction->STAT_transfer_time << " "<< (Simulator->Time() - transaction->Issue_time) - transaction->STAT_execution_time - transaction->STAT_transfer_time << " " << (Simulator->Time() - transaction->Issue_time) <<  "\n";
+		myfile.close();
 		switch (transaction->Type)
 		{
 			case Transaction_Type::READ:
+				transaction->UserIORequest->STAT_ExecutionTime += transaction->STAT_execution_time;
+				transaction->UserIORequest->STAT_TransferTime += transaction->STAT_transfer_time;
 				this->input_streams[transaction->Stream_id]->STAT_sum_of_read_transactions_execution_time += transaction->STAT_execution_time;
 				this->input_streams[transaction->Stream_id]->STAT_sum_of_read_transactions_transfer_time += transaction->STAT_transfer_time;
 				this->input_streams[transaction->Stream_id]->STAT_sum_of_read_transactions_waiting_time += (Simulator->Time() - transaction->Issue_time) - transaction->STAT_execution_time - transaction->STAT_transfer_time;
 				break;
 			case Transaction_Type::WRITE:
+				// transaction->UserIORequest->STAT_ExecutionTime += transaction->STAT_execution_time;
+				// transaction->UserIORequest->STAT_TransferTime += transaction->STAT_transfer_time;
 				this->input_streams[transaction->Stream_id]->STAT_sum_of_write_transactions_execution_time += transaction->STAT_execution_time;
 				this->input_streams[transaction->Stream_id]->STAT_sum_of_write_transactions_transfer_time += transaction->STAT_transfer_time;
 				this->input_streams[transaction->Stream_id]->STAT_sum_of_write_transactions_waiting_time += (Simulator->Time() - transaction->Issue_time) - transaction->STAT_execution_time - transaction->STAT_transfer_time;

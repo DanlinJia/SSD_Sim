@@ -71,7 +71,11 @@ namespace SSD_Components
 			return (sim_time_type)(tRCD + tCL + sim_time_type((double)(memory_access_size_in_byte / dram_burst_size_in_bytes / 2) * dram_burst_transfer_time_ddr));
 		}
 		else {
-			return (sim_time_type)((tRCD + tCL + (sim_time_type)((double)(dram_row_size / dram_burst_size_in_bytes / 2 * dram_burst_transfer_time_ddr) + tRP) * (double)(memory_access_size_in_byte / dram_row_size / 2)) + tRCD + tCL + (sim_time_type)((double)(memory_access_size_in_byte % dram_row_size) / ((double)dram_burst_size_in_bytes * dram_burst_transfer_time_ddr)));
+			return (sim_time_type)
+			((tRCD + tCL + (sim_time_type)((double)(dram_row_size / dram_burst_size_in_bytes / 2 * dram_burst_transfer_time_ddr) + tRP) 
+			* (double)(memory_access_size_in_byte / dram_row_size / 2)) 
+			+ tRCD + tCL 
+			+ (sim_time_type)((double)(memory_access_size_in_byte % dram_row_size) / ((double)dram_burst_size_in_bytes * dram_burst_transfer_time_ddr)));
 		}
 	}
 }

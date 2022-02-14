@@ -41,6 +41,13 @@ inline void Input_Stream_Manager_NVMe::Submission_queue_tail_pointer_update(stre
 {
 	((Input_Stream_NVMe *)input_streams[stream_id])->Submission_tail = tail_pointer_value;
 
+	std::ofstream myfile;
+	myfile.open ("sq_tail_tracker", std::ios::app);
+	myfile << "stream id: " << stream_id << " sq head: " << ((Input_Stream_NVMe *)input_streams[stream_id])->Submission_head <<
+	" sq tail: "<< ((Input_Stream_NVMe *)input_streams[stream_id])->Submission_tail << " on the fly: " << ((Input_Stream_NVMe *)input_streams[stream_id])->On_the_fly_requests <<
+		" "  << Simulator->Time()<<"\n";
+	myfile.close();
+
 	if (((Input_Stream_NVMe *)input_streams[stream_id])->On_the_fly_requests < Queue_fetch_size)
 	{
 		((Host_Interface_NVMe *)host_interface)->request_fetch_unit->Fetch_next_request(stream_id);
@@ -108,7 +115,13 @@ inline void Input_Stream_Manager_NVMe::Handle_serviced_request(User_Request *req
 	{
 		((Host_Interface_NVMe *)host_interface)->request_fetch_unit->Send_read_data(request);
 	}
-
+		std::ofstream myfile;
+		myfile.open ("sq_tracker", std::ios::app);
+		myfile << "stream id: " << stream_id << " sq head: " << ((Input_Stream_NVMe *)input_streams[stream_id])->Submission_head <<
+		" sq tail: "<< ((Input_Stream_NVMe *)input_streams[stream_id])->Submission_tail << " on the fly: " << ((Input_Stream_NVMe *)input_streams[stream_id])->On_the_fly_requests <<
+		 " "  << Simulator->Time()<<"\n";
+		myfile.close();
+		
 	//there are waiting requests in the submission queue but have not been fetched, due to Queue_fetch_size limit
 	if (((Input_Stream_NVMe *)input_streams[stream_id])->Submission_head != ((Input_Stream_NVMe *)input_streams[stream_id])->Submission_tail)
 	{
@@ -353,6 +366,8 @@ void Request_Fetch_Unit_NVMe::Send_completion_queue_element(User_Request *reques
 	cqe->SQ_ID = FLOW_ID_TO_Q_ID(request->Stream_id);
 	cqe->SF_P = 0x0001 & current_phase;
 	cqe->Command_Identifier = ((Submission_Queue_Entry *)request->IO_command_info)->Command_Identifier;
+	cqe->STAT_ExecutionTime = request->STAT_ExecutionTime;
+	cqe->STAT_TransferTime = request->STAT_TransferTime;
 	Input_Stream_NVMe *im = ((Input_Stream_NVMe *)hi->input_stream_manager->input_streams[request->Stream_id]);
 	host_interface->Send_write_message_to_host(im->Completion_queue_base_address + im->Completion_tail * sizeof(Completion_Queue_Entry), cqe, sizeof(Completion_Queue_Entry));
 	number_of_sent_cqe++;

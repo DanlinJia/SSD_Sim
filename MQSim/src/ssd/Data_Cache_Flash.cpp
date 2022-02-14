@@ -37,6 +37,10 @@ namespace SSD_Components
 
 	bool Data_Cache_Flash::Check_free_slot_availability()
 	{
+		std::ofstream myfile;
+		myfile.open ("dram_eviction_tracker", std::ios::app);
+		myfile << slots.size() <<" " << capacity_in_pages <<"\n";
+		myfile.close();
 		return slots.size() < capacity_in_pages;
 	}
 

@@ -192,6 +192,8 @@ namespace SSD_Components
 		}
 
 		if (user_request->Type == UserRequestType::READ) {
+			// sim_time_type execution_time = 0;
+			// sim_time_type transfer_time = 0;
 			switch (caching_mode_per_input_stream[user_request->Stream_id]) {
 				case Caching_Mode::TURNED_OFF:
 					static_cast<FTL*>(nvm_firmware)->Address_Mapping_Unit->Translate_lpa_to_ppa_and_dispatch(user_request->Transaction_list);
@@ -203,10 +205,14 @@ namespace SSD_Components
 					std::list<NVM_Transaction*>::iterator it = user_request->Transaction_list.begin();
 					while (it != user_request->Transaction_list.end()) {
 						NVM_Transaction_Flash_RD* tr = (NVM_Transaction_Flash_RD*)(*it);
+						// execution_time+= tr->STAT_execution_time;
+						// transfer_time += tr->STAT_transfer_time;
 						if (per_stream_cache[tr->Stream_id]->Exists(tr->Stream_id, tr->LPA)) {
 							page_status_type available_sectors_bitmap = per_stream_cache[tr->Stream_id]->Get_slot(tr->Stream_id, tr->LPA).State_bitmap_of_existing_sectors & tr->read_sectors_bitmap;
 							if (available_sectors_bitmap == tr->read_sectors_bitmap) {
 								user_request->Sectors_serviced_from_cache += count_sector_no_from_status_bitmap(tr->read_sectors_bitmap);
+								// user_request->STAT_ExecutionTime = execution_time;
+								// user_request->STAT_TransferTime = transfer_time;
 								user_request->Transaction_list.erase(it++);//the ++ operation should happen here, otherwise the iterator will be part of the list after erasing it from the list
 							} else if (available_sectors_bitmap != 0) {
 								user_request->Sectors_serviced_from_cache += count_sector_no_from_status_bitmap(available_sectors_bitmap);
@@ -254,8 +260,17 @@ namespace SSD_Components
 					if (shared_dram_request_queue) {
 						queue_id = 0;
 					}
+					std::ofstream myfile;
+					myfile.open ("cache_enqueue_tracker", std::ios::app);
+					myfile << user_request->ID <<" " << user_request->Transaction_list.size() << " "  << Simulator->Time()<<"\n";
+					myfile.close();
+					
 					if (user_request->Transaction_list.size() > 0) {
 						waiting_user_requests_queue_for_dram_free_slot[queue_id].push_back(user_request);
+						std::ofstream myfile;
+						myfile.open ("wc_queue_eq", std::ios::app);
+						myfile << user_request->ID <<" " << Simulator->Time()<<"\n";
+						myfile.close();
 					}
 					return;
 				}
@@ -271,6 +286,8 @@ namespace SSD_Components
 		unsigned int dram_write_size_in_sectors = 0;//The size of data written to DRAM (must be >= flash_written_back_write_size_in_sectors)
 		std::list<NVM_Transaction*>* evicted_cache_slots = new std::list<NVM_Transaction*>;
 		std::list<NVM_Transaction*> writeback_transactions;
+		// sim_time_type execution_time = 0;
+		// sim_time_type transfer_time = 0;
 		auto it = user_request->Transaction_list.begin();
 
 		int queue_id = user_request->Stream_id;
@@ -282,6 +299,7 @@ namespace SSD_Components
 			&& (back_pressure_buffer_depth[queue_id] + cache_eviction_read_size_in_sectors + flash_written_back_write_size_in_sectors) < back_pressure_buffer_max_depth) {
 			NVM_Transaction_Flash_WR* tr = (NVM_Transaction_Flash_WR*)(*it);
 			//If the logical address already exists in the cache
+			// per_stream_cache defines the cache size available to each stream or flow
 			if (per_stream_cache[tr->Stream_id]->Exists(tr->Stream_id, tr->LPA)) {
 				/*MQSim should get rid of writting stale data to the cache.
 				* This situation may result from out-of-order transaction execution*/
@@ -296,12 +314,19 @@ namespace SSD_Components
 			} else {//the logical address is not in the cache
 				if (!per_stream_cache[tr->Stream_id]->Check_free_slot_availability()) {
 					Data_Cache_Slot_Type evicted_slot = per_stream_cache[tr->Stream_id]->Evict_one_slot_lru();
+					std::ofstream myfile;
+					myfile.open ("dirty_slot_tracker", std::ios::app);
+					myfile << evicted_slot.LPA<< " " << evicted_slot.Timestamp << " "<< int(evicted_slot.Status)<<" "<< Simulator->Time() << "\n";
+					myfile.close();
 					if (evicted_slot.Status == Cache_Slot_Status::DIRTY_NO_FLASH_WRITEBACK) {
 						evicted_cache_slots->push_back(new NVM_Transaction_Flash_WR(Transaction_Source_Type::CACHE,
 							tr->Stream_id, count_sector_no_from_status_bitmap(evicted_slot.State_bitmap_of_existing_sectors) * SECTOR_SIZE_IN_BYTE,
 							evicted_slot.LPA, NULL, IO_Flow_Priority_Class::URGENT, evicted_slot.Content, evicted_slot.State_bitmap_of_existing_sectors, evicted_slot.Timestamp));
 						cache_eviction_read_size_in_sectors += count_sector_no_from_status_bitmap(evicted_slot.State_bitmap_of_existing_sectors);
 						//DEBUG2("Evicting page" << evicted_slot.LPA << " from write buffer ")
+					} else {
+						// DEBUG-Danlin
+						break;	
 					}
 				}
 				per_stream_cache[tr->Stream_id]->Insert_write_data(tr->Stream_id, tr->LPA, tr->Content, tr->DataTimeStamp, tr->write_sectors_bitmap);
@@ -328,6 +353,11 @@ namespace SSD_Components
 			read_transfer_info->next_event_type = Data_Cache_Simulation_Event_Type::MEMORY_READ_FOR_CACHE_EVICTION_FINISHED;
 			read_transfer_info->Stream_id = user_request->Stream_id;
 			service_dram_access_request(read_transfer_info);
+
+			std::ofstream myfile;
+			myfile.open ("evictted_cache_slot_tracker", std::ios::app);
+			myfile << read_transfer_info->Size_in_bytes  <<" "<< Simulator->Time() << "\n";
+			myfile.close();
 		}
 
 		//Issue memory write to write data to DRAM
@@ -339,6 +369,12 @@ namespace SSD_Components
 			write_transfer_info->Stream_id = user_request->Stream_id;
 			service_dram_access_request(write_transfer_info);
 		}
+
+		std::ofstream myfile;
+		myfile.open ("writecache_tracker", std::ios::app);
+		myfile << user_request->ID << " "<< (int)user_request->Type <<" "<< user_request->Sectors_serviced_from_cache << " " << back_pressure_buffer_depth[queue_id] << 
+		" " << cache_eviction_read_size_in_sectors << " "<< dram_write_size_in_sectors << " "<< flash_written_back_write_size_in_sectors<< " "<< back_pressure_buffer_max_depth<<"\n";
+		myfile.close();
 
 		//If any writeback should be performed, then issue flash write transactions
 		if (writeback_transactions.size() > 0) {
@@ -469,9 +505,15 @@ namespace SSD_Components
 						((Data_Cache_Manager_Flash_Advanced*)_my_instance)->write_to_destage_buffer(*user_request);
 						if ((*user_request)->Transaction_list.size() == 0) {
 							((Data_Cache_Manager_Flash_Advanced*)_my_instance)->waiting_user_requests_queue_for_dram_free_slot[sharing_id].erase(user_request++);
+							std::ofstream myfile;
+							myfile.open ("wc_queue_cp", std::ios::app);
+							myfile << ((Data_Cache_Manager_Flash_Advanced*)_my_instance)->waiting_user_requests_queue_for_dram_free_slot[sharing_id].size() << " "<< Simulator->Time() << "\n";
+							// myfile << (*user_request)->ID <<" " << ((Data_Cache_Manager_Flash_Advanced*)_my_instance)->waiting_user_requests_queue_for_dram_free_slot[sharing_id].size() << " " << Simulator->Time()<<"\n";
+							myfile.close();
 						} else {
 							user_request++;
 						}
+
 						//The traffic load on the backend is high and the waiting requests cannot be serviced
 						if (((Data_Cache_Manager_Flash_Advanced*)_my_instance)->back_pressure_buffer_depth[sharing_id] > ((Data_Cache_Manager_Flash_Advanced*)_my_instance)->back_pressure_buffer_max_depth) {
 							break;
@@ -519,6 +561,10 @@ namespace SSD_Components
 		if (memory_channel_is_busy) {
 			if(shared_dram_request_queue) {
 				dram_execution_queue[0].push(request_info);
+				std::ofstream myfile;
+				myfile.open ("rdma_queue_tracker", std::ios::app);
+				myfile  <<request_info->Size_in_bytes <<" "<< dram_execution_queue[0].size() <<"\n";
+				myfile.close();
 			} else {
 				dram_execution_queue[request_info->Stream_id].push(request_info);
 			}
@@ -526,6 +572,13 @@ namespace SSD_Components
 			Simulator->Register_sim_event(Simulator->Time() + estimate_dram_access_time(request_info->Size_in_bytes, dram_row_size,
 				dram_busrt_size, dram_burst_transfer_time_ddr, dram_tRCD, dram_tCL, dram_tRP),
 				this, request_info, static_cast<int>(request_info->next_event_type));
+
+			std::ofstream myfile;
+			myfile.open ("rdma_tracker", std::ios::app);
+			myfile << request_info->Size_in_bytes <<" "<< estimate_dram_access_time(request_info->Size_in_bytes, dram_row_size,
+				dram_busrt_size, dram_burst_transfer_time_ddr, dram_tRCD, dram_tCL, dram_tRP)<<"\n";
+			myfile.close();
+
 			memory_channel_is_busy = true;
 			dram_execution_list_turn = request_info->Stream_id;
 		}
@@ -562,6 +615,11 @@ namespace SSD_Components
 					dram_burst_transfer_time_ddr, dram_tRCD, dram_tCL, dram_tRP),
 					this, transfer_info, static_cast<int>(transfer_info->next_event_type));
 				memory_channel_is_busy = true;
+				std::ofstream myfile;
+				myfile.open ("rdma_tracker", std::ios::app);
+				myfile << transfer_info->Size_in_bytes <<" "<< estimate_dram_access_time(transfer_info->Size_in_bytes, dram_row_size,
+				dram_busrt_size, dram_burst_transfer_time_ddr, dram_tRCD, dram_tCL, dram_tRP)<<"\n";
+				myfile.close();
 			}
 		} else {
 			for (unsigned int i = 0; i < stream_count; i++) {

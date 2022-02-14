@@ -252,6 +252,14 @@ IO_Flow_Base::IO_Flow_Base(const sim_object_id_type &name, uint16_t flow_id, LHA
 		available_command_ids.insert(cqe->Command_Identifier);
 		sim_time_type device_response_time = Simulator->Time() - request->Enqueue_time;
 		sim_time_type request_delay = Simulator->Time() - request->Arrival_time;
+		
+		std::ofstream myfile;
+		myfile.open ("response", std::ios::app);
+		//myfile << request_delay << " " << request_delay - cqe->trans_t - cqe->exec_t << "\n";
+
+		myfile << request->Arrival_time <<" "<<request_delay  << "\n";
+		// << " "<< request_delay  - cqe->STAT_TransferTime - cqe->STAT_ExecutionTime  << " " << cqe->STAT_TransferTime << " " << cqe->STAT_ExecutionTime << "\n";
+		myfile.close();
 		STAT_serviced_request_count++;
 		STAT_serviced_request_count_short_term++;
 
@@ -409,6 +417,10 @@ IO_Flow_Base::IO_Flow_Base(const sim_object_id_type &name, uint16_t flow_id, LHA
 				//If either of software or hardware queue is full
 				if (NVME_SQ_FULL(nvme_queue_pair) || available_command_ids.size() == 0) {
 					waiting_requests.push_back(request);
+					std::ofstream myfile;
+					myfile.open ("io_generator_tracker", std::ios::app);
+					myfile << "io generator waiting queue len: "<< waiting_requests.size() << " " << Simulator->Time()<<"\n";
+					myfile.close();
 				} else {
 					if (nvme_software_request_queue[*available_command_ids.begin()] != NULL) {
 						PRINT_ERROR("Unexpteced situation in IO_Flow_Base! Overwriting an unhandled I/O request in the queue!")
@@ -418,10 +430,16 @@ IO_Flow_Base::IO_Flow_Base(const sim_object_id_type &name, uint16_t flow_id, LHA
 						available_command_ids.erase(available_command_ids.begin());
 						request_queue_in_memory[nvme_queue_pair.Submission_queue_tail] = request;
 						NVME_UPDATE_SQ_TAIL(nvme_queue_pair);
+						std::ofstream myfile;
+						myfile.open ("queue_tracker", std::ios::app);
+						myfile << "sq head: "<< nvme_queue_pair.Submission_queue_head <<
+						" sq tail: "<< nvme_queue_pair.Submission_queue_tail << " " << Simulator->Time()<<"\n";
+						myfile.close();
 					}
 					request->Enqueue_time = Simulator->Time();
 					pcie_root_complex->Write_to_device(nvme_queue_pair.Submission_tail_register_address_on_device, nvme_queue_pair.Submission_queue_tail);//Based on NVMe protocol definition, the updated tail pointer should be informed to the device
 				}
+
 				break;
 			case HostInterface_Types::SATA:
 				request->Source_flow_id = flow_id;
