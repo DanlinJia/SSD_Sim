@@ -1,19 +1,25 @@
-from ssd_simulator import *
+# from ssd_simulator import *
 from datetime import datetime
 import shutil
+import os
 import subprocess
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from xml.etree import ElementTree as et
+from pathlib import *
 
 class ssd_simulator:
-    def __init__(self, ssd_in_trace, net_out_trace, output_folder, output_name):
+    def __init__(self, ssd_in_trace, net_out_trace, output_folder, output_name, workload_path, ssdconfig_path):
         #ssd_simulator = ssd_simulator("/home/labuser/ssd-net-sim/Congest/ssd_work_space/ssd_tmp/tmp.trace","/home/labuser/ssd-net-sim/Congest/ssd_work_space/ssd_tmp","net-ssd.csv")
         self.distances = {"DelayTime":[], "FinishTime":[]}
         self.ssd_in_trace = ssd_in_trace
         self.net_out_trace = net_out_trace
         self.output_folder = output_folder
         self.output_path = "{}/{}".format(output_folder, output_name)
+        self.workload_path = workload_path
+        self.ssdconfig_path = ssdconfig_path
 
     def read_trace_df(self, path):
         df = pd.read_csv(path, names=["ArrivalTime", "VolumeID", "Offset", "Size", "IOType"], sep=" ")
@@ -31,20 +37,19 @@ class ssd_simulator:
         output_df.loc[:, "Size"] = output_df["Size"].apply(lambda x: x*512)
         return output_df
 
-    def run_MQSim(self, MQSim_input_trace, MQSim_output_folder, targetid):
+    def run_MQSim(self, MQSim_input_trace, MQSim_output_folder, targetid, workload_path, ssdconfig_path):
         # modify input of the workload trace
-        workload = "workload-trace.xml"
-        tree = et.parse(workload)
+        tree = et.parse(workload_path)
         tree.find('IO_Scenario/IO_Flow_Parameter_Set_Trace_Based/File_Path').text = MQSim_input_trace
-        tree.write(workload)
+        tree.write(workload_path)
         # execute MQSim
-        cmd = ["./MQSim", "-i", "ssdconfig.test.xml",  "-w", workload]
+        cmd = ["./MQSim", "-i", ssdconfig_path,  "-w", workload_path]
         # os.system("./MQSim -i ssdconfig.test.xml -w {}".format(workload))
         temp = subprocess.Popen(cmd, stdout = subprocess.PIPE)
         output = str(temp.communicate())
         # copy statistics to the output_folder
         trace_statistic = os.path.join("{}".format(MQSim_output_folder),"statistic_target{}_{}".format(targetid, os.path.basename(MQSim_input_trace)))
-        shutil.copyfile("workload-trace_scenario_1.xml", "{}".format(trace_statistic))
+        shutil.copyfile("{}_scenario_1.xml".format(PurePath(workload_path).stem), "{}".format( trace_statistic))
         with open("{}".format(trace_statistic), "w") as file:
             # TODO: extract info from the statistic file
             pass
@@ -83,7 +88,7 @@ class ssd_simulator:
             ssd_input_df.loc[:, "IOType"] = ssd_input_df.IOType.apply(lambda x: x^1)
             ssd_input_df.to_csv(path_or_buf=self.ssd_in_trace, sep=" ", header=False, index=False)
             # run MQSim
-            self.run_MQSim(self.ssd_in_trace, self.output_folder, targetid)
+            self.run_MQSim(self.ssd_in_trace, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
             # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
             response_df_list.append(self.get_response_df(response_file = "response"))
   
@@ -121,7 +126,7 @@ class ssd_simulator:
             target_df = trace_df[trace_df["TargetID"]==targetid]
             target_df.drop(["RequestID", "TargetID"], axis=1).to_csv(path_or_buf=intermedia_path, sep=" ", header=False, index=False)
             # run MQSim
-            self.run_MQSim(intermedia_path, self.output_folder, targetid)
+            self.run_MQSim(intermedia_path, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
             # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
             response_df_list.append(self.get_response_df(response_file = "response"))
         

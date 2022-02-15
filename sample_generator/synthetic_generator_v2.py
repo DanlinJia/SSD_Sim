@@ -4,6 +4,7 @@ import argparse
 import multiprocessing
 import subprocess
 import heapq
+import sys
 from numpy.core.fromnumeric import size
 
 import pandas as pd
@@ -14,7 +15,9 @@ import matplotlib.pyplot as plt
 import statistics
 
 from pandas.tseries import offsets
+from pathlib import *
 
+sys.path.append('../io_sim')
 from io_sim import *
 
 
@@ -177,13 +180,13 @@ parser.add_argument("--r_w_ratio", "-r", type=float, default=1.0, help="read wri
 parser.add_argument("--sample_folder", "-sf", type=str, help="the folder where samples are saved.")
 parser.add_argument("--trace_name", "-tn", type=str, help="the final generated trace name.")
 parser.add_argument("--workspace", "-w", type=str, help="the folder contains QMAPs.", 
-                    default="/home/labuser/Downloads/disaggregate-storage-simulator/scripts/Q3MAP/workload_space")
+                    default=os.path.abspath("./"))
 parser.add_argument("--read_arrival_time", "-rt", type=str, 
                     help="the QMAP name of read inter-arrival time.", 
-                    default="V0_MAP_R_InterArrival_1_64_MEAN_1_to_1.txt")
+                    default="V0_MAP_R_InterArrival.txt")
 parser.add_argument("--write_arrival_time", "-wt", type=str, 
                     help="the QMAP name of write inter-arrival time.",
-                    default="V0_MAP_W_InterArrival_1_64_MEAN_1_to_1.txt")
+                    default="V0_MAP_W_InterArrival.txt")
 parser.add_argument("--read_size", "-rs", type=str, 
                     help="the QMAP name of read size.",
                     default="V0_MAP_R_Size.txt")
@@ -212,7 +215,7 @@ args = parser.parse_args()
 
 
 
-synthetic_sample_folder = os.path.join(args.workspace, args.sample_folder)
+synthetic_sample_folder = os.path.join(args.workspace, "traces" , args.sample_folder)
 maps = [args.read_arrival_time, args.write_arrival_time, args.read_size, args.write_size]
 # generate samples from QMAP and save in ./traces folder
 output_status = generate_samples_from_QMAP(maps, synthetic_sample_folder)  # Generate four sample files.
@@ -310,15 +313,18 @@ print("#########################################")
 print_target_workload(trace_df)
 
 print("#########################################")
-ssd_in_trace="/home/labuser/Downloads/disaggregate-storage-simulator/traces/net-ssd-{}/tmp.trace".format(args.sample_folder)
-net_out_trace = "~/ssd-net-sim/traces/net-ssd-{}/tmp".format(args.sample_folder)
-output_folder = "/home/labuser/Downloads/disaggregate-storage-simulator/traces/net-ssd-{}".format(args.sample_folder)
+
+ssd_in_trace="io_sim_trace/net-ssd-{}/ssd.trace".format(args.sample_folder)
+net_out_trace = "io_sim_trace/net-ssd-{}/net_out_trace".format(args.sample_folder)
+output_folder = "io_sim_trace/net-ssd-{}".format(args.sample_folder)
 os.system("mkdir {}".format(output_folder))
 output_name = "{}.csv".format(args.trace_name)
+workload_path = os.path.abspath("workload.xml")
+ssdconfig_path = os.path.abspath("ssdconfig.xml")
 
 # Construct the ssd simulator to run iteration 0. 
 # .csv VS. .trace --> DelayTime and FinishTime for SSD.
-sm = ssd_simulator(ssd_in_trace, net_out_trace, output_folder, output_name)
+sm = ssd_simulator(ssd_in_trace, net_out_trace, output_folder, output_name, workload_path, ssdconfig_path)
 
 trace_path = os.path.join(output_folder, "{}.trace".format(args.trace_name))
 trace_df.to_csv(path_or_buf=trace_path, sep=",", header=True, index=False)
