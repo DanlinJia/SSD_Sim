@@ -17,4 +17,4 @@ We provide an api, a warper on top of MQSim, to interact with the network simula
 
 
 ## Tips:
-After compiling MQSim, copy the compiled executable file to both sample_generator and io_sim for further use.
+After compiling MQSim, copy the compiled executable file, workload and config files (MQSim, workload.xml, and ssdconfig.xml) to both sample_generator and io_sim for further use.
