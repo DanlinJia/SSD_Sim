@@ -1,0 +1,30 @@
+Go to http://www.cs.wm.edu/MAPQN/index.html to download the mapqn tool box and read the help document and examples on that website.
+
+You can use  map_mmpp2 function to generate MAP with D0 and D1.
+
+==============
+
+Purpose: generate a trace from the input Markovian Arrival Process (MAP) by using random number generator
+
+Example MAPs:
+
+2
+ 1
+
+-12.000975230000       0.000975230358
+   0.000080862578        -0.088000599520
+
+  12.000000000000        0.000000000000
+   0.000000000000        0.087919736940
+
+
+Run: 
+
+./BMAP-Trace map-inputfile rand-seed
+./BMAP-Trace MMPPl1-scv20-ratio0.999 230000
+
+
+
+Note: the number of samples in the generated trace is set at BMAP-Trace.h
+
+#define NUM             200000

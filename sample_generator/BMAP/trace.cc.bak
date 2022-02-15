@@ -1,0 +1,392 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+
+#include "rvgs.h"
+#include "rngs.h"
+#include "BMAP-Sim.h"
+#include "BMAP.h"
+#include "Scheduler.h"
+
+
+
+/*****************************************************************
+                    MAIN
+*****************************************************************/
+int main(int argn, char* argv[])
+{
+    FILE*       input;      //input file
+	  
+	  int 				NUM = 10000000;
+	  
+    FILE*   f_arrival;      //file arrival intervals output
+    char    filename[100];  //temp string
+
+    int i;
+
+    
+    if (argn != 6) {
+        Usage();
+        return -1;
+    }
+    
+    PlantSeeds(atol(argv[4]));
+    //PlantSeeds(1111111);
+    //PlantSeeds(1201);
+
+    /******************  Build MAP states ****************************/
+    
+    input   = fopen(argv[1], "r"); assert(input);
+    policy  = atoi(argv[2]);
+    debug   = (int)strtol(argv[3], (char **)NULL, 2);
+    d_qlen  = debug & DEBUG_QLEN;
+    d_dept  = debug & DEBUG_DEPT;
+    d_arrv  = debug & DEBUG_ARRV;
+    d_serv  = debug & DEBUG_SERV;
+    d_resp  = debug & DEBUG_RESP;
+    output   = fopen(argv[5], "a"); assert(output);
+    
+    index   = 0;
+    
+    processes = new (BMAP*) [LEV];
+    for (int i = 0; i < LEV; i++) {
+        processes[i]   = new BMAP;
+        assert(processes[i]->get_input(input, index) > 0);
+    }
+    if (policy == DELAY) {
+	delay = new BMAP;
+	assert(delay->get_input(input, index) > 0);
+    }
+    if (policy == SUPERPOS) {
+	noise = new BMAP;
+	assert(noise->get_input(input, index) > 0);
+    }
+    fclose(input);
+
+
+    /***************** Simulation   *********************************/
+ 
+    queues  = new (Scheduler*) [LEV-1];
+    //for (i = 0; i < LEV - 1; i++)
+    for (i = 0; i < 1; i++)
+	switch(policy) {
+	case FIFO:
+		fprintf(stderr, "FIFO scheduling for queue %d...\n", i); fflush(stderr);
+        	queues[i]   = new Sch_FIFO;
+		break;
+	case PS:
+		fprintf(stderr, "PS scheduling for queue %d...\n", i); fflush(stderr);
+            	queues[i]   = new Sch_PS;
+		break;
+	case SJF:
+		fprintf(stderr, "SJF scheduling for queue %d...\n", i); fflush(stderr);
+		queues[i]   = new Sch_SJF;
+		break;
+	case DELAY:
+		if (i == 0) {
+			fprintf(stderr, "DELAY scheduling for queue %d...\n", i); fflush(stderr);
+			queues[i]   = new Sch_DELAY(delay);
+		}
+		else {
+			fprintf(stderr, "FIFO scheduling for queue %d...\n", i); fflush(stderr);
+        		queues[i]   = new Sch_FIFO;
+		}
+		break;
+	case INFSERV:
+		fprintf(stderr, "INFSERV scheduling for queue %d...\n", i); fflush(stderr);
+		queues[i]   = new Sch_INFSERV;
+		break;
+	case SUPERPOS:
+		fprintf(stderr, "SUPERPOS scheduling for queue %d...\n", i); fflush(stderr);
+		queues[i]   = new Sch_FIFO;
+		break;
+	case SPLIT:
+		fprintf(stderr, "SPLIT scheduling for queue %d...\n", i); fflush(stderr);
+		queues[i]   = new Sch_SPLIT;
+		break;
+
+	case ADT_SHF:
+		fprintf(stderr, "ADT_SHF scheduling for queue %d...\n", i); fflush(stderr);
+		queues[i]   = new Sch_ADT_SHF;
+		break;
+
+	case SRPT:
+		fprintf(stderr, "SRPT scheduling for queue %d...\n", i); fflush(stderr);
+		queues[i]   = new Sch_SRPT;
+		break;
+
+	default:
+		fprintf(stderr, "Error: Wrong policy number!\n"); fflush(stderr);
+	}
+    
+    for (i = 1; i < LEV-1; i++) {
+	fprintf(stderr, "FIFO scheduling for queue %d...\n", i); fflush(stderr);
+       	queues[i]   = new Sch_FIFO;
+    }
+     
+
+
+    // Open output files
+
+    sprintf(filename, "sta-%s", argv[1]);
+    f_statis = fopen(filename, "w"); assert(f_statis);
+    
+    if (d_qlen) {
+        f_qlen  = new (FILE*) [LEV - 1];
+        for (i = 0; i < LEV - 1; i++) {
+            sprintf(filename, "ql-dist-%s-%d", argv[1], i);
+            f_qlen[i] = fopen(filename, "w");
+	    assert(f_qlen[i]);
+        }
+
+    }
+    if (d_dept) {
+        f_depart  = new (FILE*) [LEV - 1];
+        for (i = 0; i < LEV - 1; i++) {
+            sprintf(filename, "dept-%s-%d", argv[1], i);
+            f_depart[i] = fopen(filename, "w");
+	    assert(f_depart[i]);
+        }
+    }
+    if (d_arrv) {
+        sprintf(filename, "arr-%s", argv[1]);
+        f_arrival   = fopen(filename, "w");
+	assert(f_arrival);
+    }
+    if (d_serv) {
+        f_service  = new (FILE*) [LEV - 1];
+        for (i = 0; i < LEV - 1; i++) {
+            sprintf(filename, "serv-%s-%d", argv[1], i);
+            f_service[i] = fopen(filename, "w");
+	    assert(f_service[i]);
+        }
+    }
+    if (d_resp) {
+        f_response  = new (FILE*) [LEV - 1];
+        for (i = 0; i < LEV - 1; i++) {
+            sprintf(filename, "res-%s-%d", argv[1], i);
+            f_response[i] = fopen(filename, "w");
+	    assert(f_response[i]);
+        }
+    }
+    
+
+    // Simulation
+    double real_arrival, noise_arrival = INF;
+    int    real_a_bulk, noise_a_bulk = 0;
+    bool   is_noise = false;
+
+    events  = new double [LEV+1];
+    
+    real_arrival   = processes[0]->gen_interval(real_a_bulk); //arrival
+    if (policy == SUPERPOS)
+	noise_arrival   = noise->gen_interval(noise_a_bulk);
+    if (real_arrival < noise_arrival) {
+	events[0] = real_arrival;
+	a_bulk 	  = real_a_bulk;
+	is_noise  = false;
+    }
+    else {
+	events[0] = noise_arrival;
+	a_bulk 	  = noise_a_bulk;
+	is_noise  = true;
+    }
+    for (i = 1; i < LEV; i++)
+        events[i]  = INF;                            //service
+    events[LEV]  = STA_INTERVAL;                     //statistics
+    ind = 0;
+    last_time   = new double [LEV+1];
+    for (i = 0; i < LEV+1; i++)
+        last_time[i] = 0.0;
+    
+    //printf("!!! before int\n"); fflush(stdout);
+    int * iiii = new int; *iiii = 1;
+    //printf("!!! after int\n"); fflush(stdout);
+    
+    while (ind < NUM) {
+        e       = minimal(LEV+1, events);
+        time    = events[e];
+
+	switch (e) {
+	
+	/////////////// event is statistics ///////////////////////
+        
+        case LEV:
+            last_time[e]    = time;
+            
+            for (i = 0; i < LEV-1; i++) 
+                queues[i]->statis(time);
+                
+            events[LEV] += STA_INTERVAL;
+	    break;
+        
+	//////////////// event is arrival /////////////////////////////
+
+	case 0:			
+            for (i = 0; i < a_bulk; i++) {
+                interval    = time - last_time[0];
+                last_time[0]= time;
+                service     = processes[1]->gen_interval(s_bulk);
+                assert(s_bulk == 1);
+
+                //printf("queue 0: Insert at time %lf, service %lf\n", time, service);
+                //fflush(stdout);
+                events[1]   = queues[0]->arrive(time, service);
+                //queues[0]->print_queue();
+                
+                if (d_arrv) {
+                    fprintf(f_arrival, "%10.6lf\n", interval); 
+                    fflush(f_arrival);
+                }
+                if (d_serv) {
+                    fprintf(f_service[0], "%10.6lf\n", service); 
+                    fflush(f_service[0]);
+                }
+            } // for
+
+            ind         += a_bulk;
+
+	    if (is_noise) 
+		noise_arrival += noise->gen_interval(noise_a_bulk);
+	    else
+		real_arrival += processes[0]->gen_interval(real_a_bulk);
+	    if (real_arrival < noise_arrival) {
+		events[0] = real_arrival;
+		a_bulk 	  = real_a_bulk;
+		is_noise  = false;
+    	    }
+    	    else {
+		events[0] = noise_arrival;
+		a_bulk 	  = noise_a_bulk;
+		is_noise  = true;
+    	    }
+
+	    break;
+        
+            
+        ///////////// event is update //////////////////////////////
+
+        default:
+
+            events[e]       = queues[e-1]->update(time, response);
+
+	    if (response < 0) 	// This is a delay event in DELAY policy
+		continue;            
+
+	    interval	    = time - last_time[e];
+	    last_time[e]    = time;
+ 
+            if (d_dept) {
+                fprintf(f_depart[e-1], "%10.6lf\n", interval);
+                fflush(f_depart[e-1]);
+            }
+            if (d_resp) {
+                fprintf(f_response[e-1], "%10.6lf\n", response);
+                fflush(f_response[e-1]);
+            }
+
+     
+            // This departure is an arrival to next node
+            
+            if (e != LEV - 1) {
+	      //node = new struct Node;
+                service     = processes[e+1]->gen_interval(s_bulk);
+                assert(s_bulk == 1);
+                
+                //printf("queue %d: Insert at time %lf, service %lf\n", e, time, service);
+                //fflush(stdout);
+                events[e+1] = queues[e]->arrive(time, service);
+                //queues[e]->print_queue();
+                
+                if (d_serv) {
+                    fprintf(f_service[e], "%10.6lf\n", service);
+                    fflush(f_service[e]);
+                }
+            }
+            break;
+   
+        } //switch
+            
+                    
+            
+    } // while
+    // write statistics information to files
+
+    struct Statistics * sta = queues[0]->sta;
+    
+    fprintf(f_statis, "arrival: mean = %10.6lf, cv = %10.6lf\n\n",
+                    sta->mean_arrival, 
+                    sqrt(sta->svar_arrival/sta->num_arrivals) / sta->mean_arrival);
+	
+  /*****************out put results  ****************************************************
+    * file name
+    * TPUT  Util1  Resp1  Qlen1  Util2  Resp2  Qlen2..
+    ***********************************************************************************/
+//    fprintf(output, "%s\n", argv[1]);
+    fprintf(output, "%10.6lf \t", 1/sta->mean_arrival);
+
+    for (i = 0; i < LEV-1; i++) {
+        sta = queues[i]->sta;
+        fprintf(f_statis, "utilization   = %10.6lf\n", 
+                        sta->utilization);
+        fprintf(f_statis, "service: mean = %10.6lf, cv = %10.6lf\n", 
+                        sta->mean_service, 
+                        sqrt(sta->svar_service/sta->num_arrivals) / sta->mean_service);
+        fprintf(f_statis, "response:mean = %10.6lf, cv = %10.6lf\n", 
+                        sta->mean_response, 
+                        sqrt(sta->svar_response/sta->num_departs) / sta->mean_response);
+        fprintf(f_statis, "departe: mean = %10.6lf, cv = %10.6lf\n", 
+                        sta->mean_depart, 
+                        sqrt(sta->svar_depart/sta->num_departs) / sta->mean_depart);
+        fprintf(f_statis, "qlen:    mean = %10.6lf, cv = %10.6lf\n", 
+                        sta->mean_qlen, 
+                        sqrt(sta->svar_qlen/sta->num_qlen) / sta->mean_qlen);
+        
+	fprintf(output, "%10.6lf \t %10.6lf \t %10.6lf \t", sta->utilization, sta->mean_response, sta->mean_qlen);
+
+        if (d_qlen) {
+            for (int j = 0; j < 102; j++)
+                fprintf(f_qlen[i], "%10d %10.6lf\n", j, ((double)sta->qlen_dist[j])/sta->num_qlen);
+        }
+    }
+
+    fprintf(output, "\n");
+    fclose(output);
+
+    // close files
+    fclose(f_statis);
+    if (d_qlen) {
+        for (i = 0; i < LEV - 1; i++)
+            fclose(f_qlen[i]);
+        free(f_qlen);
+    }
+    if (d_dept) {
+        for (i = 0; i < LEV - 1; i++) 
+            fclose(f_depart[i]);
+        free(f_depart);
+    }
+    if (d_arrv) {
+        fclose(f_arrival);
+    }
+    if (d_serv) {
+        for (i = 0; i < LEV - 1; i++) 
+            fclose(f_service[i]);
+        free(f_service);
+    }
+    if (d_resp) {
+        for (i = 0; i < LEV - 1; i++) 
+            fclose(f_response[i]);
+        free(f_response);
+    }
+    for (i = 0; i < LEV; i++)
+      free(processes[i]);
+    free(processes);
+    for (i = 0; i < LEV-1; i++)
+      free(queues[i]);
+    free(queues);
+    free(events);
+    free(last_time);
+    return 0;
+ 
+} // main
