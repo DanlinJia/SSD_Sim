@@ -366,8 +366,6 @@ void Request_Fetch_Unit_NVMe::Send_completion_queue_element(User_Request *reques
 	cqe->SQ_ID = FLOW_ID_TO_Q_ID(request->Stream_id);
 	cqe->SF_P = 0x0001 & current_phase;
 	cqe->Command_Identifier = ((Submission_Queue_Entry *)request->IO_command_info)->Command_Identifier;
-	cqe->STAT_ExecutionTime = request->STAT_ExecutionTime;
-	cqe->STAT_TransferTime = request->STAT_TransferTime;
 	Input_Stream_NVMe *im = ((Input_Stream_NVMe *)hi->input_stream_manager->input_streams[request->Stream_id]);
 	host_interface->Send_write_message_to_host(im->Completion_queue_base_address + im->Completion_tail * sizeof(Completion_Queue_Entry), cqe, sizeof(Completion_Queue_Entry));
 	number_of_sent_cqe++;

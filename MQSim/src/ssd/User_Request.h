@@ -20,8 +20,6 @@ namespace SSD_Components
 		io_request_id_type ID;
 		LHA_type Start_LBA;
 
-		sim_time_type STAT_TransferTime;
-		sim_time_type STAT_ExecutionTime;
 		sim_time_type STAT_InitiationTime;
 		sim_time_type STAT_ResponseTime;
 		std::list<NVM_Transaction*> Transaction_list;

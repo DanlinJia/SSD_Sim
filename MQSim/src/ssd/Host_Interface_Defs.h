@@ -46,8 +46,6 @@ struct Completion_Queue_Entry
 	uint16_t SF_P; //Status Field (SF)+ Phase Tag(P)
 				   //SF: Indicates status for the command that is being completed
 				   //P:Identifies whether a Completion Queue entry is new
-	sim_time_type STAT_TransferTime;
-	sim_time_type STAT_ExecutionTime;
 };
 
 struct Submission_Queue_Entry

@@ -77,8 +77,7 @@ class ssd_simulator:
         return df_res
 
     def initialize_SSD_trace(self, snis_in_trace):
-        if os.path.exists("response"):
-            raise Exception('response file should not exist!')
+        
         trace_df = pd.read_csv(snis_in_trace, header=0)
         response_df_list = []
         for targetid in trace_df.TargetID.drop_duplicates().values:
@@ -87,6 +86,9 @@ class ssd_simulator:
             ssd_input_df = target_df[["ArrivalTime", "VolumeID", "Offset", "Size", "IOType"]].copy()
             ssd_input_df.loc[:, "IOType"] = ssd_input_df.IOType.apply(lambda x: x^1)
             ssd_input_df.to_csv(path_or_buf=self.ssd_in_trace, sep=" ", header=False, index=False)
+            
+            if os.path.exists("response"):
+                raise Exception('response file should not exist!')
             # run MQSim
             self.run_MQSim(self.ssd_in_trace, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
             # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
