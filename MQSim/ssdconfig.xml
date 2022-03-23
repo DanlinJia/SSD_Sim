@@ -43,7 +43,7 @@
 		<Preferred_suspend_write_time_for_read>100000</Preferred_suspend_write_time_for_read>
 		<Flash_Channel_Count>8</Flash_Channel_Count>
 		<Flash_Channel_Width>1</Flash_Channel_Width>
-		<Channel_Transfer_Rate>333</Channel_Transfer_Rate>
+		<Channel_Transfer_Rate>400</Channel_Transfer_Rate>
 		<Chip_No_Per_Channel>4</Chip_No_Per_Channel>
 		<Flash_Comm_Protocol>NVDDR2</Flash_Comm_Protocol>
 		<Flash_Parameter_Set>

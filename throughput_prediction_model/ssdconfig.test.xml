@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="us-ascii"?>
 <Execution_Parameter_Set>
 	<Host_Parameter_Set>
 		<PCIe_Lane_Bandwidth>1.00000</PCIe_Lane_Bandwidth>
@@ -5,8 +6,6 @@
 		<SATA_Processing_Delay>400000</SATA_Processing_Delay>
 		<Enable_ResponseTime_Logging>true</Enable_ResponseTime_Logging>
 		<ResponseTime_Logging_Period_Length>1000000</ResponseTime_Logging_Period_Length>
-        <Read_Weights>1</Read_Weights>
-        <Write_Weights>1</Write_Weights>
 	</Host_Parameter_Set>
 	<Device_Parameter_Set>
 		<Seed>321</Seed>
@@ -43,7 +42,7 @@
 		<Preferred_suspend_erase_time_for_write>700000</Preferred_suspend_erase_time_for_write>
 		<Preferred_suspend_write_time_for_read>100000</Preferred_suspend_write_time_for_read>
 		<Flash_Channel_Count>8</Flash_Channel_Count>
-		<Flash_Channel_Width>2</Flash_Channel_Width>
+		<Flash_Channel_Width>1</Flash_Channel_Width>
 		<Channel_Transfer_Rate>400</Channel_Transfer_Rate>
 		<Chip_No_Per_Channel>4</Chip_No_Per_Channel>
 		<Flash_Comm_Protocol>NVDDR2</Flash_Comm_Protocol>
