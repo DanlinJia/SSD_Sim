@@ -11,13 +11,14 @@ from xml.etree import ElementTree as et
 from pathlib import *
 
 class ssd_simulator:
-    def __init__(self, ssd_in_trace, net_out_trace, output_folder, output_name, workload_path, ssdconfig_path):
+    def __init__(self, ssd_in_trace, net_out_trace, output_folder, output_name, workload_path, ssdconfig_path, ssd_per_target=1):
         #ssd_simulator = ssd_simulator("/home/labuser/ssd-net-sim/Congest/ssd_work_space/ssd_tmp/tmp.trace","/home/labuser/ssd-net-sim/Congest/ssd_work_space/ssd_tmp","net-ssd.csv")
         self.distances = {"DelayTime":[], "FinishTime":[]}
         self.ssd_in_trace = ssd_in_trace
         self.net_out_trace = net_out_trace
         self.output_folder = output_folder
         self.output_path = "{}/{}".format(output_folder, output_name)
+        self.ssd_per_target = ssd_per_target
         self.workload_path = workload_path
         self.ssdconfig_path = ssdconfig_path
 
@@ -76,27 +77,27 @@ class ssd_simulator:
         os.remove("{}".format(response_file))
         return df_res
 
-    def initialize_SSD_trace(self, snis_in_trace):
-        
-        trace_df = pd.read_csv(snis_in_trace, header=0)
+    def simulate_target(self, trace_df):
         response_df_list = []
         for targetid in trace_df.TargetID.drop_duplicates().values:
             print("start ssd simulation for target {}".format(targetid))
             target_df = trace_df.loc[trace_df["TargetID"]==targetid, :]
-            ssd_input_df = target_df[["ArrivalTime", "VolumeID", "Offset", "Size", "IOType"]].copy()
-            ssd_input_df.loc[:, "IOType"] = ssd_input_df.IOType.apply(lambda x: x^1)
-            ssd_input_df.to_csv(path_or_buf=self.ssd_in_trace, sep=" ", header=False, index=False)
-            
-            if os.path.exists("response"):
-                raise Exception('response file should not exist!')
-            # run MQSim
-            self.run_MQSim(self.ssd_in_trace, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
-            # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
-            response_df_list.append(self.get_response_df(response_file = "response"))
-  
-        # copy("waiting", os.path.join(work_dir, "waiting"))
-        # os.remove("waiting")
-        response_df = pd.concat(response_df_list).sort_values(by=["ArrivalTime"])
+            target_df = target_df[["ArrivalTime", "VolumeID", "Offset", "Size", "IOType"]].copy()
+            for ssd_idx in range(self.ssd_per_target):
+                ssd_df = target_df[target_df.index % self.ssd_per_target == ssd_idx]  
+                ssd_df.to_csv(path_or_buf=self.ssd_in_trace, sep=" ", header=False, index=False)
+                if os.path.exists("response"):
+                    raise Exception('response file should not exist!')
+                # run MQSim
+                self.run_MQSim(self.ssd_in_trace, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
+                # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
+                response_df_list.append(self.get_response_df(response_file = "response"))
+        return pd.concat(response_df_list).sort_values(by=["ArrivalTime"])
+
+    def initialize_SSD_trace(self, snis_in_trace):
+        trace_df = pd.read_csv(snis_in_trace, header=0)
+        trace_df.loc[:, "IOType"] = trace_df.IOType.apply(lambda x: x^1)
+        response_df = self.simulate_target(trace_df)
         assert(int((response_df.ArrivalTime.values - trace_df.ArrivalTime.values).mean())==0)
         new_df = trace_df.merge(response_df, left_on='ArrivalTime', right_on='ArrivalTime')
         new_df["FinishTime"] = new_df["ArrivalTime"] + new_df["DelayTime"]
@@ -122,17 +123,17 @@ class ssd_simulator:
         trace_df.loc[:, "IOType"] = trace_df.IOType.apply(lambda x: x^1)
         # ArrivalTime is integer with ns unit
         trace_df.loc[:, "ArrivalTime"] = trace_df["ArrivalTime"].astype(np.int64)
-        response_df_list = []
-        for targetid in trace_df.TargetID.drop_duplicates().values:
-            print("start ssd simulation for target {}".format(targetid))
-            target_df = trace_df[trace_df["TargetID"]==targetid]
-            target_df.drop(["RequestID", "TargetID"], axis=1).to_csv(path_or_buf=intermedia_path, sep=" ", header=False, index=False)
-            # run MQSim
-            self.run_MQSim(intermedia_path, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
-            # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
-            response_df_list.append(self.get_response_df(response_file = "response"))
+        # response_df_list = []
+        # for targetid in trace_df.TargetID.drop_duplicates().values:
+        #     print("start ssd simulation for target {}".format(targetid))
+        #     target_df = trace_df[trace_df["TargetID"]==targetid]
+        #     target_df.drop(["RequestID", "TargetID"], axis=1).to_csv(path_or_buf=intermedia_path, sep=" ", header=False, index=False)
+        #     # run MQSim
+        #     self.run_MQSim(intermedia_path, self.output_folder, targetid, self.workload_path, self.ssdconfig_path)
+        #     # get the response_df with two columns: [ArrivalTime, DelayTime], sorted by ArrivalTime
+        #     response_df_list.append(self.get_response_df(response_file = "response"))
         
-        response_df = pd.concat(response_df_list).sort_values(by=["ArrivalTime"])
+        response_df = self.simulate_target(trace_df)
         # return response_df, trace_df
         assert(int((response_df.ArrivalTime.values - trace_df.ArrivalTime.values).mean())==0)
         ssd_df = net_df.loc[:, ["RequestID", "ArrivalTime", "DelayTime", "FinishTime", "InitiatorID", "TargetID", "IOType", "Size", "VolumeID", "Offset"]]
@@ -150,13 +151,13 @@ if __name__=="__main__":
     #workload =Congest/ssd_work_space/Fujitsu-1W_V0_based_25us_10_to_1_net-ssd.csv
     filename = "test"
     #filename = "Fujitsu-1W_V0_based_25us_10_to_1_net-ssd"
-    workload = "/home/labuser/ssd-net-sim/traces/net-ssd-Test/" + filename + ".csv"
+    workload = "/home/labuser/Downloads/disaggregate-storage-simulator/Congest/ssd_work_space/Fujitsu-1W_V0_based_25us_10_to_1_net-ssd.csv"
     ori = pd.read_csv(workload)
     init_arrival = ori.ArrivalTime
     ssd_output = "net-ssd.csv"
     ssd_sim = ssd_simulator("./tmp",
-                            workload, ".",
-                            ssd_output)
+                            workload, "./test",
+                            ssd_output, "workload.xml", "ssdconfig.test.xml", 2)
     df = ssd_sim.ssd_simulation_iter(init_arrival)
     df_sum = 0
     
