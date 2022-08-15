@@ -128,8 +128,8 @@ def print_initiator_workload(trace_df):
         initiator_df = trace_df[trace_df.InitiatorID==initiatorid]
         write_size, write_arrival, read_size, read_arrival = load_analyzer(initiator_df, True)
         write_size_std, write_arrival_std, read_size_std, read_arrival_std = load_analyzer_stdev(initiator_df)
-        write_workload = (write_size * 512 * 8/ (1024 * 1024 * 1024)) / (write_arrival / 1e-9); # unit: sector, ns --> Gbps.
-        read_workload = (read_size * 512 * 8/ (1024 * 1024 * 1024)) / (read_arrival / 1e-9); # unit: sector, ns --> Gbps.
+        write_workload = (write_size * 512 * 8/ (1024 * 1024 * 1024)) / (write_arrival / 1e9); # unit: sector, ns --> Gbps.
+        read_workload = (read_size * 512 * 8/ (1024 * 1024 * 1024)) / (read_arrival / 1e9); # unit: sector, ns --> Gbps.
         
         # Calculate the coefficient of variation (CV) of write_size, write_arrival, read_size, read_arrival.
         write_size_cv = write_size_std / write_size
@@ -153,8 +153,8 @@ def print_target_workload(trace_df):
         # load_analyzer designed for sector size and ns inter-arrival
         write_size, write_arrival, read_size, read_arrival = load_analyzer(target_df, True)
         write_size_std, write_arrival_std, read_size_std, read_arrival_std = load_analyzer_stdev(target_df)
-        write_workload = (write_size * 512 * 8/ (1024 * 1024 * 1024)) / (write_arrival / 1e-9); # unit: sector, ns --> Gbps.
-        read_workload = (read_size * 512 * 8/ (1024 * 1024 * 1024)) / (read_arrival / 1e-9); # unit: sector, ns --> Gbps.
+        write_workload = (write_size * 512 * 8/ (1024 * 1024 * 1024)) / (write_arrival / 1e9); # unit: sector, ns --> Gbps.
+        read_workload = (read_size * 512 * 8/ (1024 * 1024 * 1024)) / (read_arrival / 1e9); # unit: sector, ns --> Gbps.
         
         # Calculate the coefficient of variation (CV) of write_size, write_arrival, read_size, read_arrival.
         write_size_cv = write_size_std / write_size
