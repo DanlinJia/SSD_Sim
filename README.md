@@ -5,7 +5,7 @@ This repo contains three submodules, i.e., MQSim, sample generator, and io_sim.
 ### 1. MQSim 
 MQSim is inherited from https://github.com/CMU-SAFARI/MQSim with the following modifications:
     
-    - adding trace features to track intermedia information, including request response time and waiting time.
+    - adding features to track intermediate information, including request response time and waiting time, queue length, etc.
     - enabling cache capacity by changing a bug in SSD_Sim/MQSim/src/ssd/Data_Cache_Manager_Flash_Advanced.cpp:329. If no free slot is available, find a dirty slot to evict. Otherwise, write data without caching.
     - changing the Back Pressure Space in SSD_Sim/MQSim/src/exec/SSD_Device.cpp:340, by multiplying the default BPS (4096) with a constant value. Tips: recompile if you change the constant value.
 
