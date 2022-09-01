@@ -17,10 +17,18 @@ class ssd_simulator:
         self.ssd_in_trace = ssd_in_trace
         self.net_out_trace = net_out_trace
         self.output_folder = output_folder
+        self.output_name = output_name
         self.output_path = "{}/{}".format(output_folder, output_name)
         self.ssd_per_target = ssd_per_target
         self.workload_path = workload_path
         self.ssdconfig_path = ssdconfig_path
+
+    def set_output_folder(self, output_folder):
+        self.output_folder = output_folder
+        self.output_path = os.path.join(output_folder, self.output_name)
+    
+    def set_net_out_trace(self, net_out_trace):
+        self.net_out_trace = net_out_trace
 
     def read_trace_df(self, path):
         df = pd.read_csv(path, names=["ArrivalTime", "VolumeID", "Offset", "Size", "IOType"], sep=" ")
@@ -159,5 +167,4 @@ if __name__=="__main__":
                             workload, "./test",
                             ssd_output, "workload.xml", "ssdconfig.test.xml", 2)
     df = ssd_sim.ssd_simulation_iter(init_arrival)
-    df_sum = 0
     
